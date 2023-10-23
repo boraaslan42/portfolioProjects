@@ -1,6 +1,12 @@
 import requests
 import json
+import time
+import urllib.parse
+import openpyxl
+import pandas as pd
 
+#Written by Bora Aslan
+#https://www.upwork.com/freelancers/~01419e1fc0370fdce8
 
 def get_Data(url):
   headers = {
@@ -39,94 +45,59 @@ def get_Data(url):
   
   response = requests.get(url, headers=headers)
   json_data=json.loads(response.text)
-  print(json_data)
-  if len(json_data["data"]["search"]["searchResult"]["itemStacks"][0]["itemsV2"])==0:
-    print("No more data")
-    return
-  else:
-    return json_data
+  try:
+    if len(json_data["data"]["search"]["searchResult"]["itemStacks"][0]["itemsV2"])==0:
+        return
+    else:
+        return json_data
+  except:
+      print("Problem occured in walmart's site please reach developer")
+      exit()
+
 
 def changePageNum(pageNum,url):
-    
-
-
-    import urllib.parse
-
-    #url = "http://stackoverflow.com/search?q=question"
     url_parts = urllib.parse.urlparse(url)
     query = dict(urllib.parse.parse_qsl(url_parts.query))
     abc=json.loads(query["variables"])
-    """print(abc)
-    print(type(query["variables"]))
-
-
-    print(type(query))
-    """
-    print("Old page number is: ",abc["page"])
     abc["page"]=pageNum
     abc["mosaicPage"]=pageNum
     abc["searchParams"]["page"]=pageNum
     abc["searchParams"]["mosaicPage"]=pageNum
-    #print(abc["page"],abc["mosaicPage"],abc["searchParams"]["page"],abc["searchParams"]["mosaicPage"])
-
-    #print(query["variables"])
-    #print(abc)
-    query["variables"]=json.dumps(abc)
-    #print(query["variables"])
-
-
-    querynew = dict(urllib.parse.parse_qsl(url_parts.query))
-
     query["variables"]=json.dumps(abc)
     new_url = url_parts._replace(query=urllib.parse.urlencode(query)).geturl()
-    #print(new_url==url)
     return new_url
 
 
 def store_toXlsx(dictionaryList,fileName):
     try:
         df_existing = pd.read_excel(fileName)
-        print(fileName+" exists")
     except:
-        print("File does not exist creating file: "+fileName)
         df_existing=None
     df_new = pd.DataFrame(dictionaryList)
     df_combined = pd.concat([df_existing, df_new], ignore_index=True)
     with pd.ExcelWriter(fileName, engine='openpyxl') as writer:
         df_combined.to_excel(writer, index=False, sheet_name='Sheet')
-    print("Data is added to", fileName)
     
-import openpyxl
-import pandas as pd
 
-# Load the Excel file
 def adjustColumnWidth(file_path):
     workbook = openpyxl.load_workbook(file_path)
-
-    # Select the first sheet (you can change the sheet name if needed)
     sheet = workbook.active
-
-    # Iterate through columns and adjust the width based on the length of the first item
     for column in sheet.columns:
-        column_letter = openpyxl.utils.get_column_letter(column[0].column)  # Get the column letter
-        first_cell = column[0]  # Get the first cell in the column
+        column_letter = openpyxl.utils.get_column_letter(column[0].column) 
+        first_cell = column[0] 
         if first_cell.value == "Tags":
-            print("31111111111111111111111111111111")
             sheet.column_dimensions[column_letter].width = 25
         else:            
-            # Set the column width based on the length of the first item
-            adjusted_width = len(str(first_cell.value)) + 2  # Add a little extra space
+            adjusted_width = len(str(first_cell.value)) + 2  
             sheet.column_dimensions[column_letter].width = adjusted_width
-
-    # Save the modified workbook
     workbook.save(file_path)
-
 
 
 
 def main_function(filename,url):
 
     for i in range(1,10):
+        time.sleep(0.4)
         url=changePageNum(i,url)
         responseJson=get_Data(url)
         if responseJson==None:
@@ -152,9 +123,12 @@ def main_function(filename,url):
                 "Tags":', '.join(tags)
                 }
                 try:
-                    data_dict["Current Price"]=product["priceInfo"]["currentPrice"]["priceString"]
+                    if product["priceInfo"]["currentPrice"]==None:
+                        data_dict["Current Price"]="No Price Info"
+                    else:
+                        data_dict["Current Price"]=product["priceInfo"]["currentPrice"]["priceString"]
                 except Exception as m:
-                        print(2,m)
+                    pass
                 data_dictList.append(data_dict)
             except Exception:
                 pass
@@ -164,7 +138,6 @@ def main_function(filename,url):
 
 
 def changeUrlParameters(pageNum,catId,url):
-    import urllib.parse
     url_parts = urllib.parse.urlparse(url)
     query = dict(urllib.parse.parse_qsl(url_parts.query))
     abc=json.loads(query["variables"])
@@ -172,17 +145,13 @@ def changeUrlParameters(pageNum,catId,url):
     abc["mosaicPage"]=pageNum
     abc["searchParams"]["page"]=pageNum
     abc["searchParams"]["mosaicPage"]=pageNum
-    print(abc["catId"])
     abc["catId"]=catId
-    print(abc["catId"])
     query["variables"]=json.dumps(abc)
-    print(1,query)
     new_url = url_parts._replace(query=urllib.parse.urlencode(query)).geturl()
-    print(new_url)
     return new_url
 
 
-catIds={
+catIds={ #32 categories
     "Home Improvement":"1072864",
     "Beauty":"1085666",
     "Cell Phones":"1105910",
@@ -195,8 +164,8 @@ catIds={
     "Movies & TV Shows":"4096",
     "Sports & Outdoors":"4125",
     "Toys":"4171",
-    "Photo Center":"4174",
-    "Baby":"5426",
+    "Photo Center":"5426",
+    "Baby":"5427",
     "Patio & Garden":"5428",
     "Clothing, Shoes & Accessories":"5438",
     "Pets": "5440",
@@ -216,17 +185,18 @@ catIds={
     "Featured Brands":"14503",
     "Shop by Movie":"5920738",
 }
-"""
-catId = "5920738"  # Replace with the new catId value
-string=f"https://www.walmart.com/orchestra/snb/graphql/Deals/7836e259269834397500dcfbdbd36bec9f2ec7dabc270bb7b4dd106ae218bead/deals?variables=%7B%22id%22%3A+%22%22%2C+%22dealsId%22%3A+%22deals%2Fclearance%22%2C+%22page%22%3A+2%2C+%22mosaicPage%22%3A+2%2C+%22prg%22%3A+%22desktop%22%2C+%22facet%22%3A+%22%22%2C+%22catId%22%3A+%225920738%22%2C+%22seoPath%22%3A+%22%2Fshop%2Fdeals%2Fclearance%3FcatId%3D{catId}%22%2C+%22ps%22%3A+40%2C+%22ptss%22%3A+%22%22%2C+%22trsp%22%3A+%22%22%2C+%22min_price%22%3A+%22%22%2C+%22max_price%22%3A+%22%22%2C+%22sort%22%3A+%22best_match%22%2C+%22beShelfId%22%3A+%22%22%2C+%22recall_set%22%3A+%22%22%2C+%22module_search%22%3A+%22%22%2C+%22storeSlotBooked%22%3A+%22%22%2C+%22additionalQueryParams%22%3A+%7B%22isMoreOptionsTileEnabled%22%3A+true%7D%2C+%22searchParams%22%3A+%7B%22id%22%3A+%22%22%2C+%22dealsId%22%3A+%22deals%2Fclearance%22%2C+%22query%22%3A+%22%22%2C+%22page%22%3A+2%2C+%22mosaicPage%22%3A+2%2C+%22prg%22%3A+%22desktop%22%2C+%22facet%22%3A+%22%22%2C+%22catId%22%3A+%22{catId}%22%2C+%22seoPath%22%3A+%22%2Fshop%2Fdeals%2Fclearance%3FcatId%3D{catId}%22%2C+%22ps%22%3A+40%2C+%22ptss%22%3A+%22%22%2C+%22trsp%22%3A+%22%22%2C+%22min_price%22%3A+%22%22%2C+%22max_price%22%3A+%22%22%2C+%22sort%22%3A+%22best_match%22%2C+%22beShelfId%22%3A+%22%22%2C+%22recall_set%22%3A+%22%22%2C+%22module_search%22%3A+%22%22%2C+%22storeSlotBooked%22%3A+%22%22%2C+%22additionalQueryParams%22%3A+%7B%22isMoreOptionsTileEnabled%22%3A+true%7D%2C+%22cat_id%22%3A+%22{catId}%22%2C+%22_be_shelf_id%22%3A+%22%22%2C+%22pageType%22%3A+%22DealsPage%22%7D%2C+%22query%22%3A+null%2C+%22pageType%22%3A+%22DealsPage%22%2C+%22fetchSkyline%22%3A+true%2C+%22enablePortableFacets%22%3A+true%2C+%22enableFacetCount%22%3A+true%2C+%22tenant%22%3A+%22WM_GLASS%22%7D"
-
-"""
-import time
 
 for catId in catIds:
+    fileName=catId+".xlsx"
+    try:
+        dftest = pd.read_excel(fileName)
+        print(fileName+" exists.")
+    except:
+        print("File does not exist creating file: "+fileName+".")
+
     catIdVar=catIds[catId]
+    print("Scraping:",catId,"Department.")
     string=f"https://www.walmart.com/orchestra/snb/graphql/Deals/7836e259269834397500dcfbdbd36bec9f2ec7dabc270bb7b4dd106ae218bead/deals?variables=%7B%22id%22%3A+%22%22%2C+%22dealsId%22%3A+%22deals%2Fclearance%22%2C+%22page%22%3A+2%2C+%22mosaicPage%22%3A+2%2C+%22prg%22%3A+%22desktop%22%2C+%22facet%22%3A+%22%22%2C+%22catId%22%3A+%225920738%22%2C+%22seoPath%22%3A+%22%2Fshop%2Fdeals%2Fclearance%3FcatId%3D{catIdVar}%22%2C+%22ps%22%3A+40%2C+%22ptss%22%3A+%22%22%2C+%22trsp%22%3A+%22%22%2C+%22min_price%22%3A+%22%22%2C+%22max_price%22%3A+%22%22%2C+%22sort%22%3A+%22best_match%22%2C+%22beShelfId%22%3A+%22%22%2C+%22recall_set%22%3A+%22%22%2C+%22module_search%22%3A+%22%22%2C+%22storeSlotBooked%22%3A+%22%22%2C+%22additionalQueryParams%22%3A+%7B%22isMoreOptionsTileEnabled%22%3A+true%7D%2C+%22searchParams%22%3A+%7B%22id%22%3A+%22%22%2C+%22dealsId%22%3A+%22deals%2Fclearance%22%2C+%22query%22%3A+%22%22%2C+%22page%22%3A+2%2C+%22mosaicPage%22%3A+2%2C+%22prg%22%3A+%22desktop%22%2C+%22facet%22%3A+%22%22%2C+%22catId%22%3A+%22{catIdVar}%22%2C+%22seoPath%22%3A+%22%2Fshop%2Fdeals%2Fclearance%3FcatId%3D{catIdVar}%22%2C+%22ps%22%3A+40%2C+%22ptss%22%3A+%22%22%2C+%22trsp%22%3A+%22%22%2C+%22min_price%22%3A+%22%22%2C+%22max_price%22%3A+%22%22%2C+%22sort%22%3A+%22best_match%22%2C+%22beShelfId%22%3A+%22%22%2C+%22recall_set%22%3A+%22%22%2C+%22module_search%22%3A+%22%22%2C+%22storeSlotBooked%22%3A+%22%22%2C+%22additionalQueryParams%22%3A+%7B%22isMoreOptionsTileEnabled%22%3A+true%7D%2C+%22cat_id%22%3A+%22{catIdVar}%22%2C+%22_be_shelf_id%22%3A+%22%22%2C+%22pageType%22%3A+%22DealsPage%22%7D%2C+%22query%22%3A+null%2C+%22pageType%22%3A+%22DealsPage%22%2C+%22fetchSkyline%22%3A+true%2C+%22enablePortableFacets%22%3A+true%2C+%22enableFacetCount%22%3A+true%2C+%22tenant%22%3A+%22WM_GLASS%22%7D"
-    print(catIds[catId],catId,string)
-    main_function(catId+".xlsx",string)
+    main_function(fileName,string)
     time.sleep(5)
-#main_function("Walmart.xlsx",string)
+    print("Data is added to:", fileName+".")
